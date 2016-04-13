@@ -249,6 +249,12 @@ class elFinderVolumeS3 extends elFinderVolumeDriver {
 
             foreach ($objects as $object) {
                 if (!empty($object['Key'])) {
+                    if (substr($object['Key'], -1) == '/') {
+                        return [
+                            'mime' => 'directory'
+                        ];
+                    }
+
                     $stat['ts'] = $object['LastModified'];
                     $stat['size'] = $object['Size'];
 
@@ -347,10 +353,20 @@ class elFinderVolumeS3 extends elFinderVolumeDriver {
         $finalfiles = array();
 
         foreach ($objects as $object) {
+            $isDir = false;
             if (isset($object['Prefix'])) {
-                // Dirs
-                $finalfiles[] = $object['Prefix'];
+                $key = $object['Prefix'];
+                $isDir = true;
+            } else {
+                $key = $object['Key'];
+                if (substr($object['Key'], -1) == '/') {
+                    $isDir = true;
+                }
+            }
 
+            $finalfiles[] = $key;
+
+            if ($isDir) {
                 $stat = array(
                     'size' => 0,
                     'ts' => time(),
@@ -360,12 +376,7 @@ class elFinderVolumeS3 extends elFinderVolumeDriver {
                     'hidden' => false,
                     'mime' => 'directory',
                 );
-
-                $this->updateCache($object['Prefix'], $stat);
             } else {
-                // Files
-                $finalfiles[] = $object['Key'];
-
                 $stat = array(
                     'size' => $object['Size'],
                     'ts' => $object['LastModified'],
@@ -377,9 +388,9 @@ class elFinderVolumeS3 extends elFinderVolumeDriver {
                     // TODO: check it
                     'tmb' => $object['Key']
                 );
-
-                $this->updateCache($object['Key'], $stat);
             }
+
+            $this->updateCache($key, $stat);
         }
 
         sort($finalfiles);
